@@ -46,16 +46,13 @@ server.on("connection", (ws) => {
             candidate: parsedData.candidate,
           })
         );
-        return;
-      }
-      if (ws === sender) {
+      } else if (ws === sender) {
         receiver?.send(
           JSON.stringify({
             type: parsedData.type,
             candidate: parsedData.candidate,
           })
         );
-        return;
       }
     }
   });

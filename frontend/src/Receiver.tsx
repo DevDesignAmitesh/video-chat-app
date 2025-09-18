@@ -2,47 +2,43 @@ import { useEffect, useRef } from "react";
 
 const Receiver = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // const getMedia = async () => {
-  //   const media = await navigator.mediaDevices.getUserMedia({
-  //     video: true,
-  //     audio: true,
-  //   });
+  useEffect(() => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+        {
+          urls: "turn:relay1.expressturn.com:3480",
+          username: "000000002073456016",
+          credential: "gQbzPfO/mKNu6qA2SsyooQ6Abnk=",
+        },
+      ],
+    });
+    pcRef.current = pc;
 
-  //   const videoTrack = media.getVideoTracks()[0];
-
-  //   if (videoRef.current && videoTrack) {
-  //     videoRef.current.srcObject = new MediaStream([videoTrack]);
-  //   }
-  // };
-
-  const main = async () => {
-    // await getMedia();
-
-    console.log(videoRef);
-
-    const ws = new WebSocket("ws://localhost:8080");
-    const pc = new RTCPeerConnection();
-
-    ws.onopen = async () => {
-      ws.send(JSON.stringify({ type: "receiver" }));
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        wsRef.current?.send(
+          JSON.stringify({ type: "ice-candidate", candidate: event.candidate })
+        );
+      }
     };
 
     pc.ontrack = (event) => {
       if (videoRef.current) {
-        videoRef.current.srcObject = new MediaStream([event.track]);
+        videoRef.current.srcObject = event.streams[0]!;
       }
     };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        ws.send(
-          JSON.stringify({
-            type: "ice-candidate",
-            candidate: event.candidate,
-          })
-        );
-      }
+    const ws = new WebSocket("ws://localhost:8080");
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "receiver" }));
     };
 
     ws.onmessage = async (event) => {
@@ -52,30 +48,24 @@ const Receiver = () => {
         await pc.setRemoteDescription(parsedData.sdp);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-
-        ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription }));
+        ws.send(JSON.stringify({ type: "answer", sdp: answer }));
       }
 
       if (parsedData.type === "ice-candidate") {
         try {
           await pc.addIceCandidate(parsedData.candidate);
         } catch (err) {
-          console.error("Error adding received ice candidate", err);
+          console.error("Error adding ICE candidate", err);
         }
       }
     };
-  };
-
-  useEffect(() => {
-    main();
-  }, [videoRef]);
+  }, []);
 
   return (
     <div>
       <video
         ref={videoRef}
         style={{ height: 300, width: 400 }}
-        muted
         autoPlay
         playsInline
       />

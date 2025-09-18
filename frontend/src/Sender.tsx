@@ -1,81 +1,80 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 const Sender = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [pcg, setPc] = useState<RTCPeerConnection | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const getMedia = async (pc: RTCPeerConnection) => {
-    const media = await navigator.mediaDevices.getUserMedia({
+  const getMedia = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
     });
 
-    const videoTrack = media.getVideoTracks()[0];
-
-    if (videoRef.current && videoTrack) {
-      videoRef.current.srcObject = new MediaStream([videoTrack]);
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
     }
 
-    media.getTracks().forEach((track) => {
-      pc.addTrack(track);
+    stream.getTracks().forEach((track) => {
+      pcRef.current?.addTrack(track, stream);
     });
   };
 
-  const main = async () => {
-    const ws = new WebSocket("ws://localhost:8080");
-    const pc = new RTCPeerConnection();
-    setPc(pc);
+  const handleCall = async () => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+        {
+          urls: "turn:relay1.expressturn.com:3480",
+          username: "000000002073456016",
+          credential: "gQbzPfO/mKNu6qA2SsyooQ6Abnk=",
+        },
+      ],
+    });
+    pcRef.current = pc;
 
-    await getMedia(pc);
-
-    console.log(videoRef);
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "sender" }));
-    };
-
-    pc.ontrack = (event) => {
-      if (videoRef.current) {
-        if (!videoRef.current.srcObject) {
-          videoRef.current.srcObject = new MediaStream();
-        }
-        (videoRef.current.srcObject as MediaStream).addTrack(event.track);
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        ws.send(
-          JSON.stringify({
-            type: "ice-candidate",
-            candidate: event.candidate,
-          })
-        );
-      }
-    };
+    await getMedia();
 
     pc.onnegotiationneeded = async () => {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      wsRef.current?.send(JSON.stringify({ type: "offer", sdp: offer }));
+    };
 
-      ws.send(JSON.stringify({ type: "offer", sdp: pc.localDescription }));
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        wsRef.current?.send(
+          JSON.stringify({ type: "ice-candidate", candidate: event.candidate })
+        );
+      }
+    };
+  };
+
+  useEffect(() => {
+    const ws = new WebSocket("ws://localhost:8080");
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "sender" }));
     };
 
     ws.onmessage = async (event) => {
       const parsedData = JSON.parse(event.data);
 
       if (parsedData.type === "answer") {
-        await pc.setRemoteDescription(parsedData.sdp);
+        await pcRef.current?.setRemoteDescription(parsedData.sdp);
       }
 
       if (parsedData.type === "ice-candidate") {
-        await pc.addIceCandidate(parsedData.candidate);
+        try {
+          await pcRef.current?.addIceCandidate(parsedData.candidate);
+        } catch (err) {
+          console.error("Error adding ICE candidate", err);
+        }
       }
     };
-  };
-
-  useEffect(() => {
-    main();
   }, []);
 
   return (
@@ -87,6 +86,7 @@ const Sender = () => {
         autoPlay
         playsInline
       />
+      <button onClick={handleCall}>Join</button>
     </div>
   );
 };
