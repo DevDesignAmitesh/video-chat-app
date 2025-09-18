@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 
 const Sender = () => {
+  // my video
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // remote video
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -21,6 +25,10 @@ const Sender = () => {
   };
 
   const handleCall = async () => {
+    await getMedia();
+  };
+
+  useEffect(() => {
     const pc = new RTCPeerConnection({
       iceServers: [
         {
@@ -35,7 +43,11 @@ const Sender = () => {
     });
     pcRef.current = pc;
 
-    await getMedia();
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0]!;
+      }
+    };
 
     pc.onnegotiationneeded = async () => {
       const offer = await pc.createOffer();
@@ -50,10 +62,8 @@ const Sender = () => {
         );
       }
     };
-  };
-
-  useEffect(() => {
-    const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
+    // const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
+    const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -64,12 +74,25 @@ const Sender = () => {
       const parsedData = JSON.parse(event.data);
 
       if (parsedData.type === "answer") {
-        await pcRef.current?.setRemoteDescription(parsedData.sdp);
+        await pc.setRemoteDescription(parsedData.sdp);
+      }
+
+      if (parsedData.type === "offer") {
+        console.log("inside the offer");
+        console.log(parsedData);
+        await pc.setRemoteDescription(parsedData.sdp);
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        console.log(answer);
+
+        ws.send(JSON.stringify({ type: "answer", sdp: answer }));
       }
 
       if (parsedData.type === "ice-candidate") {
         try {
-          await pcRef.current?.addIceCandidate(parsedData.candidate);
+          await pc.addIceCandidate(parsedData.candidate);
         } catch (err) {
           console.error("Error adding ICE candidate", err);
         }
@@ -81,6 +104,13 @@ const Sender = () => {
     <div>
       <video
         ref={videoRef}
+        style={{ height: 300, width: 400 }}
+        muted
+        autoPlay
+        playsInline
+      />
+      <video
+        ref={remoteVideoRef}
         style={{ height: 300, width: 400 }}
         muted
         autoPlay

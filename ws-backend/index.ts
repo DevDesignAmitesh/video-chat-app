@@ -5,11 +5,14 @@ const server = new WebSocketServer({ port: 8080 });
 let sender: WebSocket | null = null;
 let receiver: WebSocket | null = null;
 console.log("running");
+
 server.on("connection", (ws) => {
   console.log("connection done");
+
   ws.on("message", (data) => {
     const parsedData = JSON.parse(data.toString());
     console.log(parsedData);
+    
     if (parsedData.type === "sender") {
       sender = ws;
     }
@@ -20,7 +23,9 @@ server.on("connection", (ws) => {
 
     if (parsedData.type === "offer") {
       if (ws !== sender) {
-        return;
+        sender?.send(
+          JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
+        );
       }
 
       receiver?.send(
@@ -30,7 +35,9 @@ server.on("connection", (ws) => {
 
     if (parsedData.type === "answer") {
       if (ws !== receiver) {
-        return;
+        receiver?.send(
+          JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
+        );
       }
 
       sender?.send(
