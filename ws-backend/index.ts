@@ -12,7 +12,7 @@ server.on("connection", (ws) => {
   ws.on("message", (data) => {
     const parsedData = JSON.parse(data.toString());
     console.log(parsedData);
-    
+
     if (parsedData.type === "sender") {
       sender = ws;
     }
@@ -26,11 +26,13 @@ server.on("connection", (ws) => {
         sender?.send(
           JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
         );
+        return;
       }
 
       receiver?.send(
         JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
       );
+      return;
     }
 
     if (parsedData.type === "answer") {
@@ -38,11 +40,14 @@ server.on("connection", (ws) => {
         receiver?.send(
           JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
         );
+
+        return;
       }
 
       sender?.send(
         JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
       );
+      return;
     }
 
     if (parsedData.type === "ice-candidate") {
@@ -53,13 +58,16 @@ server.on("connection", (ws) => {
             candidate: parsedData.candidate,
           })
         );
-      } else if (ws === sender) {
+        return;
+      }
+      if (ws === sender) {
         receiver?.send(
           JSON.stringify({
             type: parsedData.type,
             candidate: parsedData.candidate,
           })
         );
+        return;
       }
     }
   });

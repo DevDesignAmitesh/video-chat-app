@@ -21,9 +21,9 @@ const Receiver = () => {
     }
 
     stream.getTracks().forEach((track) => {
-      console.log("running");
-      pcRef.current?.addTrack(track, stream);
-      console.log("failed");
+      if (pcRef.current) {
+        pcRef.current.addTrack(track, stream);
+      }
     });
   };
 
@@ -57,15 +57,13 @@ const Receiver = () => {
     };
 
     pc.onnegotiationneeded = async () => {
-      console.log("this is running after addtrack")
       const offer = await pc.createOffer();
-      console.log(offer)
       await pc.setLocalDescription(offer);
-
       ws.send(JSON.stringify({ type: "offer", sdp: offer }));
     };
 
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
+    // const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -76,7 +74,12 @@ const Receiver = () => {
       const parsedData = JSON.parse(event.data);
 
       if (parsedData.type === "offer") {
-        await pc.setRemoteDescription(parsedData.sdp);
+        try {
+          await pc.setRemoteDescription(parsedData.sdp);
+        } catch (error) {
+          console.log("eror is here?");
+          console.log(error);
+        }
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         ws.send(JSON.stringify({ type: "answer", sdp: answer }));
@@ -91,9 +94,6 @@ const Receiver = () => {
       }
 
       if (parsedData.type === "answer") {
-        console.log("inside the answer")
-        console.log(pc)
-        console.log(parsedData)
         try {
           await pc.setRemoteDescription(parsedData.sdp);
         } catch (error) {
@@ -102,10 +102,6 @@ const Receiver = () => {
         }
       }
     };
-  };
-
-  const handleCall = async () => {
-    await getMedia();
   };
 
   useEffect(() => {
@@ -126,7 +122,7 @@ const Receiver = () => {
         autoPlay
         playsInline
       />
-      <button onClick={handleCall}>join</button>
+      <button onClick={getMedia}>join</button>
     </div>
   );
 };

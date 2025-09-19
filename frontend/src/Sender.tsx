@@ -24,10 +24,6 @@ const Sender = () => {
     });
   };
 
-  const handleCall = async () => {
-    await getMedia();
-  };
-
   useEffect(() => {
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -62,8 +58,8 @@ const Sender = () => {
         );
       }
     };
-    // const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
+    // const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -78,23 +74,22 @@ const Sender = () => {
       }
 
       if (parsedData.type === "offer") {
-        console.log("inside the offer");
-        console.log(parsedData);
-        await pc.setRemoteDescription(parsedData.sdp);
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        console.log(answer);
-
-        ws.send(JSON.stringify({ type: "answer", sdp: answer }));
+        try {
+          await pc.setRemoteDescription(parsedData.sdp);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: "answer", sdp: answer }));
+        } catch (error) {
+          console.log("eror is here?");
+          console.log(error);
+        }
       }
 
       if (parsedData.type === "ice-candidate") {
         try {
           await pc.addIceCandidate(parsedData.candidate);
         } catch (err) {
-          console.error("Error adding ICE candidate", err);
+          console.log("Error adding ICE candidate", err);
         }
       }
     };
@@ -116,7 +111,7 @@ const Sender = () => {
         autoPlay
         playsInline
       />
-      <button onClick={handleCall}>Join</button>
+      <button onClick={getMedia}>Join</button>
     </div>
   );
 };
