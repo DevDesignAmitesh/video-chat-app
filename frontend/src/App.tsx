@@ -1,23 +1,34 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import Sender from "./Sender";
-import Receiver from "./Receiver";
+import { Routes, Route, useNavigate } from "react-router-dom";
+// import Sender from "./Sender";
+// import Receiver from "./Receiver";
+import { useState } from "react";
+import Room from "./Room";
 
 export const App = () => {
+  const [roomName, setRoomName] = useState<string>("");
+  const navigate = useNavigate();
+
+  const handleJoinRoom = () => {
+    navigate(`/room/${encodeURIComponent(roomName)}`, { state: { roomName } });
+  };
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <div>
-              <Link to={"/sender"}>Sender</Link>
-              <Link to={"/receiver"}>Receiver</Link>
-            </div>
-          }
-        />
-        <Route path="/sender" element={<Sender />} />
-        <Route path="/receiver" element={<Receiver />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <div>
+            <input
+              type="text"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Enter Room Name"
+            />
+            <button onClick={handleJoinRoom}>Join Room</button>
+          </div>
+        }
+      />
+      <Route path="/room/*" element={<Room roomName={roomName} />} />
+    </Routes>
   );
 };

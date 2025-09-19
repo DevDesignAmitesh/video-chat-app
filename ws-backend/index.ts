@@ -1,74 +1,48 @@
-import { WebSocket, WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 
-const server = new WebSocketServer({ port: 8080 });
+const wss = new WebSocketServer({ port: 8080 });
 
-let sender: WebSocket | null = null;
-let receiver: WebSocket | null = null;
-console.log("running");
+const rooms: Map<string, { name: string; ws: WebSocket }[]> = new Map(); // roomName -> [{ name, ws }]
 
-server.on("connection", (ws) => {
-  console.log("connection done");
+wss.on("connection", (ws) => {
+  ws.on("message", (msg) => {
+    const data = JSON.parse(msg.toString());
+    console.log(data)
 
-  ws.on("message", (data) => {
-    const parsedData = JSON.parse(data.toString());
-    console.log(parsedData);
-
-    if (parsedData.type === "sender") {
-      sender = ws;
-    }
-
-    if (parsedData.type === "receiver") {
-      receiver = ws;
-    }
-
-    if (parsedData.type === "offer") {
-      if (ws !== sender) {
-        sender?.send(
-          JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
-        );
-        return;
+    if (data.type === "join") {
+      if (!rooms.has(data.room)) {
+        rooms.set(data.room, []);
       }
+      rooms.get(data.room)?.push({ name: data.name, ws });
 
-      receiver?.send(
-        JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
-      );
-      return;
-    }
-
-    if (parsedData.type === "answer") {
-      if (ws !== receiver) {
-        receiver?.send(
-          JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
-        );
-
-        return;
-      }
-
-      sender?.send(
-        JSON.stringify({ type: parsedData.type, sdp: parsedData.sdp })
-      );
-      return;
-    }
-
-    if (parsedData.type === "ice-candidate") {
-      if (ws === receiver) {
-        sender?.send(
+      // notify all about new participant
+      rooms.get(data.room)?.forEach((user) => {
+        user.ws.send(
           JSON.stringify({
-            type: parsedData.type,
-            candidate: parsedData.candidate,
+            type: "participants",
+            participants: rooms.get(data.room)?.map((u) => u.name),
           })
         );
-        return;
-      }
-      if (ws === sender) {
-        receiver?.send(
-          JSON.stringify({
-            type: parsedData.type,
-            candidate: parsedData.candidate,
-          })
-        );
-        return;
+      });
+    }
+
+    if (["offer", "answer", "ice-candidate"].includes(data.type)) {
+      // forward only to the target user
+      const targetUser = rooms.get(data.room)?.find((u) => u.name === data.to);
+      if (targetUser) {
+        targetUser.ws.send(JSON.stringify(data));
       }
     }
   });
+
+  ws.on("close", () => {
+    rooms.forEach((users, room) => {
+      rooms.set(
+        room,
+        users.filter((u) => u.ws !== ws)
+      );
+    });
+  });
 });
+
+console.log("Signaling server running on ws://localhost:8080");

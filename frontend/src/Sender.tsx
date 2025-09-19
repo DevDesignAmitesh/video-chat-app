@@ -1,119 +1,120 @@
-import { useEffect, useRef } from "react";
+// import { useEffect, useRef } from "react";
+// import { WS_URL } from "./constant";
 
-const Sender = () => {
-  // my video
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+// const Sender = () => {
+//   // my video
+//   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // remote video
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+//   // remote video
+//   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+//   const pcRef = useRef<RTCPeerConnection | null>(null);
+//   const wsRef = useRef<WebSocket | null>(null);
 
-  const getMedia = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
+//   const getMedia = async () => {
+//     const stream = await navigator.mediaDevices.getUserMedia({
+//       video: true,
+//       audio: true,
+//     });
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
+//     if (videoRef.current) {
+//       videoRef.current.srcObject = stream;
+//     }
 
-    stream.getTracks().forEach((track) => {
-      pcRef.current?.addTrack(track, stream);
-    });
-  };
+//     stream.getTracks().forEach((track) => {
+//       pcRef.current?.addTrack(track, stream);
+//     });
+//   };
 
-  useEffect(() => {
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-        {
-          urls: "turn:relay1.expressturn.com:3480",
-          username: "000000002073456016",
-          credential: "gQbzPfO/mKNu6qA2SsyooQ6Abnk=",
-        },
-      ],
-    });
-    pcRef.current = pc;
+//   useEffect(() => {
+//     const pc = new RTCPeerConnection({
+//       iceServers: [
+//         {
+//           urls: "stun:stun.l.google.com:19302",
+//         },
+//         {
+//           urls: "turn:relay1.expressturn.com:3480",
+//           username: "000000002073456016",
+//           credential: "gQbzPfO/mKNu6qA2SsyooQ6Abnk=",
+//         },
+//       ],
+//     });
+//     pcRef.current = pc;
 
-    pc.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0]!;
-      }
-    };
+//     pc.ontrack = (event) => {
+//       if (remoteVideoRef.current) {
+//         remoteVideoRef.current.srcObject = event.streams[0]!;
+//       }
+//     };
 
-    pc.onnegotiationneeded = async () => {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      wsRef.current?.send(JSON.stringify({ type: "offer", sdp: offer }));
-    };
+//     pc.onnegotiationneeded = async () => {
+//       const offer = await pc.createOffer();
+//       await pc.setLocalDescription(offer);
+//       wsRef.current?.send(JSON.stringify({ type: "offer", sdp: offer }));
+//     };
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        wsRef.current?.send(
-          JSON.stringify({ type: "ice-candidate", candidate: event.candidate })
-        );
-      }
-    };
-    const ws = new WebSocket("https://video-chat-app-z09r.onrender.com");
-    // const ws = new WebSocket("ws://localhost:8080");
-    wsRef.current = ws;
+//     pc.onicecandidate = (event) => {
+//       if (event.candidate) {
+//         wsRef.current?.send(
+//           JSON.stringify({ type: "ice-candidate", candidate: event.candidate })
+//         );
+//       }
+//     };
+//     const ws = new WebSocket(WS_URL);
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "sender" }));
-    };
+//     wsRef.current = ws;
 
-    ws.onmessage = async (event) => {
-      const parsedData = JSON.parse(event.data);
+//     ws.onopen = () => {
+//       ws.send(JSON.stringify({ type: "sender" }));
+//     };
 
-      if (parsedData.type === "answer") {
-        await pc.setRemoteDescription(parsedData.sdp);
-      }
+//     ws.onmessage = async (event) => {
+//       const parsedData = JSON.parse(event.data);
 
-      if (parsedData.type === "offer") {
-        try {
-          await pc.setRemoteDescription(parsedData.sdp);
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          ws.send(JSON.stringify({ type: "answer", sdp: answer }));
-        } catch (error) {
-          console.log("eror is here?");
-          console.log(error);
-        }
-      }
+//       if (parsedData.type === "answer") {
+//         await pc.setRemoteDescription(parsedData.sdp);
+//       }
 
-      if (parsedData.type === "ice-candidate") {
-        try {
-          await pc.addIceCandidate(parsedData.candidate);
-        } catch (err) {
-          console.log("Error adding ICE candidate", err);
-        }
-      }
-    };
-  }, []);
+//       if (parsedData.type === "offer") {
+//         try {
+//           await pc.setRemoteDescription(parsedData.sdp);
+//           const answer = await pc.createAnswer();
+//           await pc.setLocalDescription(answer);
+//           ws.send(JSON.stringify({ type: "answer", sdp: answer }));
+//         } catch (error) {
+//           console.log("eror is here?");
+//           console.log(error);
+//         }
+//       }
 
-  return (
-    <div>
-      <video
-        ref={videoRef}
-        style={{ height: 300, width: 400 }}
-        muted
-        autoPlay
-        playsInline
-      />
-      <video
-        ref={remoteVideoRef}
-        style={{ height: 300, width: 400 }}
-        muted
-        autoPlay
-        playsInline
-      />
-      <button onClick={getMedia}>Join</button>
-    </div>
-  );
-};
+//       if (parsedData.type === "ice-candidate") {
+//         try {
+//           await pc.addIceCandidate(parsedData.candidate);
+//         } catch (err) {
+//           console.log("Error adding ICE candidate", err);
+//         }
+//       }
+//     };
+//   }, []);
 
-export default Sender;
+//   return (
+//     <div>
+//       <video
+//         ref={videoRef}
+//         style={{ height: 300, width: 400 }}
+//         muted
+//         autoPlay
+//         playsInline
+//       />
+//       <video
+//         ref={remoteVideoRef}
+//         style={{ height: 300, width: 400 }}
+//         muted
+//         autoPlay
+//         playsInline
+//       />
+//       <button onClick={getMedia}>Join</button>
+//     </div>
+//   );
+// };
+
+// export default Sender;
